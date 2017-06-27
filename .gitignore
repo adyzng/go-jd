@@ -1,0 +1,17 @@
+*.db
+*.log
+log/
+custom/
+data/
+*.cookies
+*.png
+.vendor/
+.idea/
+*.iml
+*.exe
+*.exe~
+*.pem
+*.bak
+output*
+debug
+/release
