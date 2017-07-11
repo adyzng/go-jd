@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,9 +26,11 @@ import (
 )
 
 const (
-	URLSKUState    = "http://c0.3.cn/stock"
+	//URLSKUState    = "http://c0.3.cn/stock"
+	URLSKUState    = "https://c0.3.cn/stocks"
 	URLGoodsDets   = "http://item.jd.com/%s.html"
 	URLGoodsPrice  = "http://p.3.cn/prices/mgets"
+	URLAdd2Cart    = "https://cart.jd.com/gate.action"
 	URLChangeCount = "http://cart.jd.com/changeNum.action"
 	URLCartInfo    = "https://cart.jd.com/cart.action"
 	URLOrderInfo   = "http://trade.jd.com/shopping/order/getOrderInfo.action"
@@ -327,7 +330,7 @@ func (jd *JingDong) waitForScan(URL string) error {
 
 	for retry := 50; retry != 0; retry-- {
 		if resp, err = jd.client.Do(req); err != nil {
-			clog.Info("下载二维码失败：%+v", err)
+			clog.Info("二维码失效：%+v", err)
 			break
 		}
 
@@ -430,10 +433,21 @@ func (jd *JingDong) Login(args ...interface{}) error {
 		return err
 	}
 
+	// for different platform
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("explorer", qrImg)
+	case "linux":
+		cmd = exec.Command("gnome-open", qrImg)
+	default:
+		cmd = exec.Command("open", qrImg)
+	}
+
 	// just start, do not wait it complete
-	cmd := exec.Command("explorer", qrImg)
 	if err = cmd.Start(); err != nil {
-		clog.Info("Error %+v.", err)
+		clog.Info("打开二维码图片失败: %+v.", err)
+		return err
 	}
 
 	if err = jd.waitForScan(URLForQR[2]); err != nil {
@@ -477,8 +491,8 @@ func (jd *JingDong) CartDetails() error {
 		return err
 	}
 
-	clog.Info("购买  数量  价格      总价      商品")
-	cartFormat := "%-6s%-6s%-10s%-10s%s"
+	clog.Info("购买  数量  价格      总价      编号      商品")
+	cartFormat := "%-6s%-6s%-10s%-10s%-10s%s"
 
 	doc.Find("div.item-form").Each(func(i int, p *goquery.Selection) {
 		check := " -"
@@ -493,11 +507,20 @@ func (jd *JingDong) CartDetails() error {
 			count = val
 		}
 
+		pid := ""
+		hrefTag := p.Find("div.p-img a").Eq(0)
+		if href, exist := hrefTag.Attr("href"); exist {
+			// http://item.jd.com/2967929.html
+			pos1 := strings.LastIndex(href, "/")
+			pos2 := strings.LastIndex(href, ".")
+			pid = href[pos1+1 : pos2]
+		}
+
 		price := strings.Trim(p.Find("div.p-price strong").Eq(0).Text(), " ")
 		total := strings.Trim(p.Find("div.p-sum strong").Eq(0).Text(), " ")
 		gname := strings.Trim(p.Find("div.p-name a").Eq(0).Text(), " \n\t")
 		gname = truncate(gname)
-		clog.Info(cartFormat, check, count, price, total, gname)
+		clog.Info(cartFormat, check, count, price, total, pid, gname)
 	})
 
 	totalCount := strings.Trim(doc.Find("div.amount-sum em").Eq(0).Text(), " ")
@@ -685,6 +708,7 @@ func (jd *JingDong) getPrice(ID string) (string, error) {
 // stockState return stock state
 // http://c0.3.cn/stock?skuId=531065&area=1_72_2799_0&cat=1,1,1&buyNum=1
 // http://c0.3.cn/stock?skuId=531065&area=1_72_2799_0&cat=1,1,1
+// https://c0.3.cn/stocks?type=getstocks&skuIds=4099139&area=1_72_2799_0&_=1499755881870
 //
 // {"3133811":{"StockState":33,"freshEdi":null,"skuState":1,"PopType":0,"sidDely":"40",
 //	"channel":1,"StockStateName":"现货","rid":null,"rfg":0,"ArrivalDate":"",
@@ -693,10 +717,12 @@ func (jd *JingDong) stockState(ID string) (string, string, error) {
 	data, err := jd.getResponse("GET", URLSKUState, func(URL string) string {
 		u, _ := url.Parse(URL)
 		q := u.Query()
-		q.Set("skuId", ID)
+		q.Set("type", "getstocks")
+		q.Set("skuIds", ID)
 		q.Set("area", jd.ShipArea)
-		q.Set("cat", "1,1,1")
-		q.Set("buyNum", strconv.Itoa(1))
+		q.Set("_", strconv.FormatInt(time.Now().Unix()*1000, 10))
+		//q.Set("cat", "1,1,1")
+		//q.Set("buyNum", strconv.Itoa(1))
 		u.RawQuery = q.Encode()
 		return u.String()
 	})
@@ -718,10 +744,11 @@ func (jd *JingDong) stockState(ID string) (string, string, error) {
 		return "", "", err
 	}
 
-	if sku, exist := js.CheckGet("stock"); exist {
-		skuState, _ := sku.Get("StockState").String()
+	//if sku, exist := js.CheckGet("stock"); exist {
+	if sku, exist := js.CheckGet(ID); exist {
+		skuState, _ := sku.Get("StockState").Int()
 		skuStateName, _ := sku.Get("StockStateName").String()
-		return skuState, skuStateName, nil
+		return strconv.Itoa(skuState), skuStateName, nil
 	}
 
 	return "", "", fmt.Errorf("无效响应数据")
@@ -769,7 +796,7 @@ func (jd *JingDong) skuDetail(ID string) (*SKUInfo, error) {
 	return g, nil
 }
 
-func (jd *JingDong) buyCount(ID string, count int) (int, error) {
+func (jd *JingDong) changeCount(ID string, count int) (int, error) {
 	data, err := jd.getResponse("POST", URLChangeCount, func(URL string) string {
 		u, _ := url.Parse(URL)
 		q := u.Query()
@@ -785,6 +812,7 @@ func (jd *JingDong) buyCount(ID string, count int) (int, error) {
 		u.RawQuery = q.Encode()
 		return u.String()
 	})
+
 	if err != nil {
 		clog.Error(0, "修改商品数量失败: %+v", err)
 		return 0, err
@@ -794,7 +822,7 @@ func (jd *JingDong) buyCount(ID string, count int) (int, error) {
 	return js.Get("pcount").Int()
 }
 
-func (jd *JingDong) buyOne(sku *SKUInfo) error {
+func (jd *JingDong) buyGood(sku *SKUInfo) error {
 	var (
 		err  error
 		data []byte
@@ -813,6 +841,16 @@ func (jd *JingDong) buyOne(sku *SKUInfo) error {
 			clog.Error(0, "获取(%s)库存失败: %+v", sku.ID, err)
 			return err
 		}
+	}
+
+	if sku.Link == "" || sku.Count != 1 {
+		u, _ := url.Parse(URLAdd2Cart)
+		q := u.Query()
+		q.Set("pid", sku.ID)
+		q.Set("pcount", strconv.Itoa(sku.Count))
+		q.Set("ptype", "1")
+		u.RawQuery = q.Encode()
+		sku.Link = u.String()
 	}
 
 	if _, err := url.Parse(sku.Link); err != nil {
@@ -840,7 +878,7 @@ func (jd *JingDong) buyOne(sku *SKUInfo) error {
 	if succFlag != "" {
 		count := 0
 		if sku.Count > 1 {
-			count, err = jd.buyCount(sku.ID, sku.Count)
+			count, err = jd.changeCount(sku.ID, sku.Count)
 		}
 
 		if count > 0 {
@@ -860,7 +898,7 @@ func (jd *JingDong) RushBuy(skuLst map[string]int) {
 			defer wg.Done()
 			if sku, err := jd.skuDetail(id); err == nil {
 				sku.Count = count
-				jd.buyOne(sku)
+				jd.buyGood(sku)
 			}
 		}(id, cnt)
 	}
