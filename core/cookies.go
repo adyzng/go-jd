@@ -132,14 +132,14 @@ func (jar *SimpleJar) Persist() error {
 
 	switch jar.jarType {
 	case JarGob:
-		fd, err := os.OpenFile(jar.filename, os.O_CREATE, os.ModePerm)
+		fd, err := os.Create(jar.filename)
 		if err == nil {
 			err = gob.NewEncoder(fd).Encode(jar.cookies)
 		}
 		return err
 
 	case JarJson:
-		fd, err := os.OpenFile(jar.filename, os.O_CREATE, os.ModePerm)
+		fd, err := os.Create(jar.filename)
 		if err == nil {
 			err = json.NewEncoder(fd).Encode(jar.cookies)
 		}

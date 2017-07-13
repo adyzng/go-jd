@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"runtime"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/axgle/mahonia"
 	sjson "github.com/bitly/go-simplejson"
@@ -282,7 +284,7 @@ func (jd *JingDong) loadQRCode(URL string) (string, error) {
 	filename = filepath.Join(dir, filename)
 	clog.Trace("QR Image: %s", filename)
 
-	file, _ := os.OpenFile(filename, os.O_CREATE, os.ModePerm)
+	file, _ := os.Create(filename)
 	defer file.Close()
 
 	if _, err = io.Copy(file, resp.Body); err != nil {
