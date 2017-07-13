@@ -19,8 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"runtime"
-
 	"github.com/PuerkitoBio/goquery"
 	"github.com/axgle/mahonia"
 	sjson "github.com/bitly/go-simplejson"
