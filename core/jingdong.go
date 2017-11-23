@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -388,13 +389,37 @@ func (jd *JingDong) validateQRToken(URL string) error {
 		clog.Info("请求（%+v）失败: %+v", URL, err)
 		return err
 	}
-
 	if resp, err = jd.client.Do(req); err != nil {
 		clog.Error(0, "二维码登陆校验失败: %+v", err)
 		return nil
 	}
 
+	//
+	// 京东有时候会认为当前登录有危险，需要手动验证
+	// url: https://safe.jd.com/dangerousVerify/index.action?username=...
+	//
+	if resp.Header.Get("P3P") == "" {
+		var res struct {
+			ReturnCode int    `json:"returnCode"`
+			Token      string `json:"token"`
+			URL        string `json:"url"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+			if res.URL != "" {
+				verifyURL := res.URL
+				if !strings.HasPrefix(verifyURL, "https:") {
+					verifyURL = "https:" + verifyURL
+				}
+				clog.Error(2, "安全验证: %s", verifyURL)
+				jd.runCommand(verifyURL)
+			}
+		}
+		return fmt.Errorf("login failed")
+	}
+
 	if resp.StatusCode == http.StatusOK {
+		//data, _ := ioutil.ReadAll(resp.Body)
+		//clog.Info("Body: %s.", string(data))
 		clog.Info("登陆成功, P3P: %s", resp.Header.Get("P3P"))
 	} else {
 		clog.Info("登陆失败")
@@ -402,6 +427,31 @@ func (jd *JingDong) validateQRToken(URL string) error {
 	}
 
 	resp.Body.Close()
+	return nil
+}
+
+func (jd *JingDong) runCommand(strCmd string) error {
+	var err error
+	var cmd *exec.Cmd
+
+	// for different platform
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", strCmd)
+	case "linux":
+		cmd = exec.Command("eog", strCmd)
+	default:
+		cmd = exec.Command("open", strCmd)
+	}
+
+	// just start, do not wait it complete
+	if err = cmd.Start(); err != nil {
+		if runtime.GOOS == "linux" {
+			cmd = exec.Command("gnome-open", strCmd)
+			return cmd.Start()
+		}
+		return err
+	}
 	return nil
 }
 
@@ -432,19 +482,8 @@ func (jd *JingDong) Login(args ...interface{}) error {
 		return err
 	}
 
-	// for different platform
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("explorer", qrImg)
-	case "linux":
-		cmd = exec.Command("eog", qrImg)
-	default:
-		cmd = exec.Command("open", qrImg)
-	}
-
 	// just start, do not wait it complete
-	if err = cmd.Start(); err != nil {
+	if err = jd.runCommand(qrImg); err != nil {
 		clog.Info("打开二维码图片失败: %+v.", err)
 		return err
 	}

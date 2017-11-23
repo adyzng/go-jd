@@ -1,8 +1,8 @@
 # go-AutoBuy
 
-最近在学习Golang，虽然有些毛病吧，但是简洁高效，简直是Web开发利器。
+最近在学习Golang，路转粉。
 
-那就拿Golang来重写Python版京东自动下单工具[jd-autobuy](https://github.com/Adyzng/jd-autobuy)来练手吧。
+拿Golang重写了下Python版[jd-autobuy](https://github.com/Adyzng/jd-autobuy)。
 
 
 ## 登陆
