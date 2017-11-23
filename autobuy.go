@@ -55,7 +55,6 @@ func main() {
 
 	defer jd.Release()
 	if err := jd.Login(); err == nil {
-		jd.CartDetails()
 		jd.RushBuy(gs)
 	}
 }
