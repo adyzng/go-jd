@@ -97,7 +97,7 @@ func NewJingDong(option JDConfig) *JingDong {
 	}
 
 	jd.jar = NewSimpleJar(JarOption{
-		JarType:  JarJson,
+		JarType:  JarGob,
 		Filename: cookieFile,
 	})
 
@@ -131,7 +131,6 @@ func truncate(str string) string {
 	if len(rs) > maxNameLen {
 		return string(rs[:maxNameLen-1]) + "..."
 	}
-
 	return str
 }
 
@@ -439,7 +438,7 @@ func (jd *JingDong) Login(args ...interface{}) error {
 	case "windows":
 		cmd = exec.Command("explorer", qrImg)
 	case "linux":
-		cmd = exec.Command("gnome-open", qrImg)
+		cmd = exec.Command("eog", qrImg)
 	default:
 		cmd = exec.Command("open", qrImg)
 	}
@@ -491,8 +490,8 @@ func (jd *JingDong) CartDetails() error {
 		return err
 	}
 
-	clog.Info("购买  数量  价格      总价      编号      商品")
-	cartFormat := "%-6s%-6s%-10s%-10s%-10s%s"
+	clog.Info("购买  数量  价格      总价      编号        商品")
+	cartFormat := "%-6s%-6s%-10s%-10s%-12s%s"
 
 	doc.Find("div.item-form").Each(func(i int, p *goquery.Selection) {
 		check := " -"
@@ -790,8 +789,12 @@ func (jd *JingDong) skuDetail(ID string) (*SKUInfo, error) {
 	g.Price, _ = jd.getPrice(ID)
 	g.State, g.StateName, _ = jd.stockState(ID)
 
-	info := fmt.Sprintf("编号: %s, 库存: %s, 价格: %s, 链接: %s", g.ID, g.StateName, g.Price, g.Link)
-	clog.Info(info)
+	//info := fmt.Sprintf("编号: %s, 库存: %s, 价格: %s, 链接: %s", g.ID, g.StateName, g.Price, g.Link)
+	//clog.Info(info)
+
+	clog.Info(strSeperater)
+	clog.Info("商品详情>")
+	clog.Info("编号: %s, 库存: %s, 价格: %s", g.ID, g.StateName, g.Price)
 
 	return g, nil
 }
@@ -828,8 +831,6 @@ func (jd *JingDong) buyGood(sku *SKUInfo) error {
 		data []byte
 		doc  *goquery.Document
 	)
-	clog.Info(strSeperater)
-	clog.Info("购买商品: %s", sku.ID)
 
 	// 33 : on sale
 	// 34 : out of stock
@@ -852,6 +853,7 @@ func (jd *JingDong) buyGood(sku *SKUInfo) error {
 		u.RawQuery = q.Encode()
 		sku.Link = u.String()
 	}
+	clog.Info("购买链接: %s", sku.Link)
 
 	if _, err := url.Parse(sku.Link); err != nil {
 		clog.Error(0, "商品购买链接无效: <%s>", sku.Link)
@@ -882,7 +884,7 @@ func (jd *JingDong) buyGood(sku *SKUInfo) error {
 		}
 
 		if count > 0 {
-			clog.Info("成功加入进购物车 %d 个 %s", count, sku.Name)
+			clog.Info("购买结果：成功加入进购物车 [%d] 个 [%s]", count, sku.Name)
 			return nil
 		}
 	}
@@ -904,6 +906,7 @@ func (jd *JingDong) RushBuy(skuLst map[string]int) {
 	}
 
 	wg.Wait()
+	jd.CartDetails()
 	jd.OrderInfo()
 
 	if jd.AutoSubmit {

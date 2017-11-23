@@ -141,7 +141,9 @@ func (jar *SimpleJar) Persist() error {
 	case JarJson:
 		fd, err := os.Create(jar.filename)
 		if err == nil {
-			err = json.NewEncoder(fd).Encode(jar.cookies)
+			enc := json.NewEncoder(fd)
+			enc.SetIndent("", "    ")
+			err = enc.Encode(jar.cookies)
 		}
 		return err
 
