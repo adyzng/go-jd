@@ -17,7 +17,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -873,7 +872,8 @@ func (jd *JingDong) buyGood(sku *SKUInfo) error {
 
 	// 33 : on sale
 	// 34 : out of stock
-	for sku.State != "33" && jd.AutoRush {
+	// 库存状态还有一种是采购中，但是依然可以下单，state 未知
+	for sku.State == "34" && jd.AutoRush {
 		clog.Warn("%s : %s", sku.StateName, sku.Name)
 		time.Sleep(jd.Period)
 		sku.State, sku.StateName, err = jd.stockState(sku.ID)
@@ -931,24 +931,36 @@ func (jd *JingDong) buyGood(sku *SKUInfo) error {
 	return err
 }
 
+// 支持多件商品抢购直接下单
 func (jd *JingDong) RushBuy(skuLst map[string]int) {
-	var wg sync.WaitGroup
+	// 主协程结束堵塞 channel
+	endChannel := make(chan int, len(skuLst))
+	// 提交订单另外开一个 worker 执行，此为执行队列
+	submitOrderSemp := make(chan int)
+
 	for id, cnt := range skuLst {
-		wg.Add(1)
 		go func(id string, count int) {
-			defer wg.Done()
 			if sku, err := jd.skuDetail(id); err == nil {
 				sku.Count = count
 				jd.buyGood(sku)
+				jd.OrderInfo()
+				if jd.AutoSubmit {
+					// jd.SubmitOrder()
+					submitOrderSemp <- 1
+				}
 			}
 		}(id, cnt)
 	}
-
-	wg.Wait()
-	jd.CartDetails()
-	jd.OrderInfo()
-
-	if jd.AutoSubmit {
-		jd.SubmitOrder()
+	// submitOrder worker
+	go func() {
+		for {
+			<-submitOrderSemp
+			jd.SubmitOrder()
+			endChannel <- 1
+			time.Sleep(time.Millisecond * 1000)
+		}
+	}()
+	for i := 0; i < len(skuLst); i++ {
+		<-endChannel
 	}
 }
