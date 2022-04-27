@@ -62,7 +62,7 @@ func NewSimpleJar(option JarOption) *SimpleJar {
 // on the jar's policy and implementation.
 //
 func (jar *SimpleJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
-	if cookies == nil || len(cookies) == 0 {
+	if len(cookies) == 0 {
 		return
 	}
 

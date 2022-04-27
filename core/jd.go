@@ -180,7 +180,7 @@ func (jd *JingDong) validateLogin(URL string) bool {
 	)
 
 	if req, err = http.NewRequest("GET", URL, nil); err != nil {
-		clog.Info("请求（%+v）失败: %+v", URL, err)
+		clog.Info("请求(%+v)失败: %+v", URL, err)
 		return false
 	}
 
@@ -221,7 +221,7 @@ func (jd *JingDong) loginPage(URL string) error {
 	)
 
 	if req, err = http.NewRequest("GET", URL, nil); err != nil {
-		clog.Info("请求（%+v）失败: %+v", URL, err)
+		clog.Info("请求(%+v)失败: %+v", URL, err)
 		return err
 	}
 
@@ -253,7 +253,7 @@ func (jd *JingDong) loadQRCode(URL string) (string, error) {
 	u.RawQuery = q.Encode()
 
 	if req, err = http.NewRequest("GET", u.String(), nil); err != nil {
-		clog.Error(0, "请求（%+v）失败: %+v", URL, err)
+		clog.Error(0, "请求(%+v)失败: %+v", URL, err)
 		return "", err
 	}
 
@@ -318,7 +318,7 @@ func (jd *JingDong) waitForScan(URL string) error {
 	u.RawQuery = q.Encode()
 
 	if req, err = http.NewRequest("GET", u.String(), nil); err != nil {
-		clog.Info("请求（%+v）失败: %+v", URL, err)
+		clog.Info("请求(%+v)失败: %+v", URL, err)
 		return err
 	}
 
@@ -385,7 +385,7 @@ func (jd *JingDong) validateQRToken(URL string) error {
 	u.RawQuery = q.Encode()
 
 	if req, err = http.NewRequest("GET", u.String(), nil); err != nil {
-		clog.Info("请求（%+v）失败: %+v", URL, err)
+		clog.Info("请求(%+v)失败: %+v", URL, err)
 		return err
 	}
 	if resp, err = jd.client.Do(req); err != nil {
@@ -454,6 +454,7 @@ func (jd *JingDong) runCommand(strCmd string) error {
 	return nil
 }
 
+// TODO(adyzng) updatethe login logic
 // Login used to login JD by QR code.
 // if the cookies file exits, will try cookies first.
 //
@@ -513,7 +514,7 @@ func (jd *JingDong) CartDetails() error {
 	)
 
 	if req, err = http.NewRequest("GET", URLCartInfo, nil); err != nil {
-		clog.Error(0, "请求（%+v）失败: %+v", URLCartInfo, err)
+		clog.Error(0, "请求(%+v)失败: %+v", URLCartInfo, err)
 		return err
 	}
 
@@ -587,7 +588,7 @@ func (jd *JingDong) OrderInfo() error {
 	u.RawQuery = q.Encode()
 
 	if req, err = http.NewRequest("GET", u.String(), nil); err != nil {
-		clog.Error(0, "请求（%+v）失败: %+v", URLCartInfo, err)
+		clog.Error(0, "请求(%+v)失败: %+v", URLCartInfo, err)
 		return err
 	}
 
@@ -728,7 +729,7 @@ func (jd *JingDong) getPrice(ID string) (string, error) {
 	})
 
 	if err != nil {
-		clog.Error(0, "获取商品（%s）价格失败: %+v", ID, err)
+		clog.Error(0, "获取商品(%s)价格失败: %+v", ID, err)
 		return "", err
 	}
 
@@ -765,7 +766,7 @@ func (jd *JingDong) stockState(ID string) (string, string, error) {
 	})
 
 	if err != nil {
-		clog.Error(0, "获取商品（%s）库存失败: %+v", ID, err)
+		clog.Error(0, "获取商品(%s)库存失败: %+v", ID, err)
 		return "", "", err
 	}
 
